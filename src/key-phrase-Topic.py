@@ -76,10 +76,9 @@ print('='*20)
 doc_embedding = sbert.encode([doc])
 word_embeddings = sbert.encode(words)
 
-# Calculate distances and extract keywords
+# Calculate distances 
 dists = util.pytorch_cos_sim(doc_embedding, word_embeddings).numpy()
-# ~ idx_topK = dists.argsort()[0][::-1][:top_k]
-# ~ kws = [(words[idx],dists[0][idx]) for idx in idx_topK]
+
 
 # == Cut =================
 # ~ thr=0.2
@@ -114,20 +113,22 @@ um = ump.fit_transform(tv)
 cls = hdbscan.HDBSCAN(min_cluster_size=10,
                         # ~ cluster_selection_epsilon=0.5,
                         min_samples=1,
-                          metric='euclidean',
-                          cluster_selection_method='eom').fit(um)
+                        metric='euclidean',
+                        cluster_selection_method='eom').fit(um)
 
 lbs  = cls.labels_
 lbus = set(lbs)
 
 plt.figure('UMAP')
-plt.scatter(um[:, 0], um[:, 1],c = lbs) # ,c = lv_r, s=ts_r cmap=cmap
+plt.scatter(um[:, 0], um[:, 1],c = lbs,s=0.5) # ,c = lv_r, s=ts_r cmap=cmap
 
 
 plt.show()
 
 
-
+# Sorting
+idxs = dists.argsort()[0][::-1]
+kws = [(words[idx],dists[0][idx],lbs[idx]) for idx in idxs]
 
 
 wc = [[(words[idx],dists[0][idx]) for idx in range(len(words)) if cls.labels_[idx]==lb] for lb in lbus  ]
