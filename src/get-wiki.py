@@ -9,7 +9,6 @@ import re
 def clean(sx):
     sx = strip_tags(sx)
     sx = strip_numeric(sx)
-    # ~ sx = strip_non_alphanum(sx)
     sx = re.sub(r'\n',' ',sx)
     sx = re.sub(r'\[','',sx)
     sx = re.sub(r'\]','',sx)
