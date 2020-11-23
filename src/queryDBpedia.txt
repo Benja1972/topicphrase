@@ -1,0 +1,40 @@
+select distinct(?tech) str(?tech_name) str(?cls) str(?abs)
+where {
+
+{?tech dct:subject dbc:Artificial_intelligence.
+dbc:Artificial_intelligence rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Artificial_neural_networks.
+dbc:Artificial_neural_networks rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Artificial_intelligence_applications.
+dbc:Artificial_intelligence_applications rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Face_recognition.
+dbc:Face_recognition rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Computer_vision.
+dbc:Computer_vision rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Natural_language_processing.
+dbc:Natural_language_processing rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Machine_learning.
+dbc:Machine_learning rdfs:label ?cls.}
+UNION
+
+{?tech dct:subject dbc:Machine_learning_algorithms.
+dbc:Machine_learning_algorithms rdfs:label ?cls.}
+
+?tech dbo:abstract ?abs.
+?tech rdfs:label ?tech_name.
+FILTER(lang(?tech_name ) = 'en')
+FILTER(lang(?abs ) = 'en')
+
+}
