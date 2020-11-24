@@ -9,9 +9,6 @@ import string
 import pke
 from nltk.corpus import stopwords
 
-import sys
-sys.path.append("lexrank/")
-from lexrank.lexrank import  degree_centrality_scores
 
 
 # ==  Functions
@@ -73,64 +70,76 @@ print('='*20)
 # Key-phrases by SentBERT =============
 
 # Extract Embeddings
-doc_embedding = sbert.encode([doc])
-word_embeddings = sbert.encode(words)
+doc_emb = sbert.encode([doc])
+word_emb = sbert.encode(words)
 
 # Calculate distances 
-dists = util.pytorch_cos_sim(doc_embedding, word_embeddings).numpy()
-
-
-# == Cut =================
-# ~ thr=0.2
-# ~ idx_cut = dists[0][:]>thr
-
-# ~ wrc = [words[idx] for idx in range(len(words)) if idx_cut[idx]==True ]
-# ~ wrc_e = word_embeddings[idx_cut]
-# ~ dst_c = dists[0][idx_cut]
-
-# ~ print('\n\n Key-phrases by SentBERT \n'+'-'*20)
-# ~ [print(kw) for kw in kws ]
-
-print('='*20)
-#  ==================================================
-
-
-
-
-import matplotlib.pyplot as plt
-
-
-import umap
-
-tv = word_embeddings
-
-import hdbscan
-ump = umap.UMAP(n_neighbors=15,n_components=5,metric='cosine') #,random_state=234
-um = ump.fit_transform(tv)
-
-
-
-cls = hdbscan.HDBSCAN(min_cluster_size=10,
-                        # ~ cluster_selection_epsilon=0.5,
-                        min_samples=1,
-                        metric='euclidean',
-                        cluster_selection_method='eom').fit(um)
-
-lbs  = cls.labels_
-lbus = set(lbs)
-
-plt.figure('UMAP')
-plt.scatter(um[:, 0], um[:, 1],c = lbs,s=0.5) # ,c = lv_r, s=ts_r cmap=cmap
-
-
-plt.show()
+dists = util.pytorch_cos_sim(doc_emb, word_emb).numpy()
 
 
 # Sorting
 idxs = dists.argsort()[0][::-1]
-kws = [(words[idx],dists[0][idx],lbs[idx]) for idx in idxs]
+kws = [(words[idx],dists[0][idx]) for idx in idxs]
 
 
-wc = [[(words[idx],dists[0][idx]) for idx in range(len(words)) if cls.labels_[idx]==lb] for lb in lbus  ]
-# ~ wc = [[(wrc[idx],dst_c[idx]) for idx in range(len(wrc)) if cls.labels_[idx]==lb] for lb in lbus  ]
-wccs = [np.array(wcc)[np.argsort([w[1] for w in wcc])][::-1] for wcc in wc]
+
+
+
+
+
+import umap
+
+
+
+import hdbscan
+ump = umap.UMAP(n_neighbors=10,n_components=3,metric='cosine') #,random_state=234
+um = ump.fit_transform(word_emb)
+
+
+
+cls = hdbscan.HDBSCAN(min_cluster_size=15,
+                        cluster_selection_epsilon=0.2,
+                        min_samples=1,
+                        metric='euclidean',
+                        cluster_selection_method='leaf').fit(um) # 'leaf' 'eom'
+
+lbs  = cls.labels_
+lbus = set(lbs)
+
+
+
+def get_mean_sort(wa,n=5):
+    ws = [[wc[ix] for ix in np.argsort([w[1] for w in wc])[::-1]] for wc in wa]
+    rs = [np.mean([wd[1] for wd in wi ][:n]) for wi in ws]
+    idrs = np.argsort(np.array(rs))[::-1]
+    ws = [ws[ids] for ids in idrs]
+    return ws, rs
+        
+
+
+
+wc = [[(words[idx],dists[0][idx]) for idx in range(len(words)) if lbs[idx]==lb] for lb in lbus]
+ws, rs = get_mean_sort(wc,n=5)
+
+
+from pprint import pprint
+def print_top(wa,n=8):
+    pprint([w[:n] for w in wa])
+
+
+
+
+# Plot
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+
+pltte = sns.color_palette('Paired', 100)
+cls = [pltte[x] if x >= 0 else (0.5, 0.5, 0.5) for x in lbs]
+
+plt.figure('UMAP')
+plt.scatter(um[:, 0], um[:, 1],c = cls,s=1) # ,c = lv_r, s=ts_r cmap=cmap
+
+
+plt.show()
