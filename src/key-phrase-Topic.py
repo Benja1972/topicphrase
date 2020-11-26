@@ -1,8 +1,5 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
-import torch
-import pandas as pd
-import re
 
 import string
 import pke
