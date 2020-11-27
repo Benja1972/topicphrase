@@ -127,8 +127,8 @@ with open(f_in, 'r') as fin:
 
 doc = ' '.join(docs)
 
-# ~ model = 'distilbert-base-nli-stsb-mean-tokens'
-model = 'distilbert-base-nli-stsb-wkpooling'
+model = 'distilbert-base-nli-stsb-mean-tokens'
+# ~ model = 'distilbert-base-nli-stsb-wkpooling'
 sbert = SentenceTransformer(model)
 sbert.max_seq_length = 256
 # ===========================================
@@ -153,27 +153,3 @@ lbs = get_clusters(word_emb)
 ws, rs = get_mean_sort(words,dists,lbs,n=5)
 
 
-
-
-
-
-
-
-
-
-
-
-# Plot
-# ~ import matplotlib.pyplot as plt
-# ~ import seaborn as sns
-
-
-
-# ~ pltte = sns.color_palette('Paired', 100)
-# ~ cls = [pltte[x] if x >= 0 else (0.5, 0.5, 0.5) for x in lbs]
-
-# ~ plt.figure('UMAP')
-# ~ plt.scatter(um[:, 0], um[:, 1],c = cls,s=1) # ,c = lv_r, s=ts_r cmap=cmap
-
-
-# ~ plt.show()
