@@ -1,4 +1,4 @@
-# Key-phare extraction with Sentence Transformers
+# Key-phrase extraction with Sentence Transformers
 Simple code for extraction of key-phrases from single document based on Sentence Trasfomers [sentence-transformers](https://github.com/UKPLab/sentence-transformers). It combines several ideas from different pacakges. Core steps of pipe-line include:
 - extract noun phrase candidates using spacy (for simplicity we take part of the  code from pke package [pke](https://github.com/boudinfl/pke));
 - calculate embedding of phrases and orogonal document with help of  Sentence Trasfomers;
