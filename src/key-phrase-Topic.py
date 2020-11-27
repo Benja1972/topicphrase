@@ -110,46 +110,45 @@ def print_top(wa,n=8):
     pprint([w[:n] for w in wa])
 # ===========================================
 
+if __name__ == '__main__':
+
+    # Load data  and embedder ============================
+
+    nm = 'Self-driving_car'
+    print(nm)
+    print('='*20)
+
+    f_in  = '../data/self-car.txt'
+    docs = []
+
+    with open(f_in, 'r') as fin:
+        for dcc in fin:
+            docs.append(dcc.strip('\r\n'))
+
+    doc = ' '.join(docs)
+
+    model = 'distilbert-base-nli-stsb-mean-tokens'
+    sbert = SentenceTransformer(model)
+    # ===========================================
 
 
-# Load data  and embedder ============================
+    # Get candidates =============
+    stop_words = stopwords.words('english')
 
-nm = 'Self-driving_car'
-print(nm)
-print('='*20)
+    pos = {'NOUN', 'PROPN', 'ADJ'} 
+    stoplist = list(string.punctuation)
+    stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
+    stoplist += stop_words
+    words = get_candidates(doc,pos=pos,stoplost=stoplist)
 
-f_in  = '../data/self-car.txt'
-docs = []
+    #  Embded ================
+    word_emb, dists = embed_sort(doc,words,sbert)
 
-with open(f_in, 'r') as fin:
-    for dcc in fin:
-        docs.append(dcc.strip('\r\n'))
+    # Cluster ======================
+    lbs = get_clusters(word_emb)
 
-doc = ' '.join(docs)
+    # Group and sort===================
+    ws, rs = get_mean_sort(words,dists,lbs,n=5)
 
-model = 'distilbert-base-nli-stsb-mean-tokens'
-# ~ model = 'distilbert-base-nli-stsb-wkpooling'
-sbert = SentenceTransformer(model)
-sbert.max_seq_length = 256
-# ===========================================
-
-
-# Get candidates =============
-stop_words = stopwords.words('english')
-
-pos = {'NOUN', 'PROPN', 'ADJ'} #"ADV"
-stoplist = list(string.punctuation)
-stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
-stoplist += stop_words
-words = get_candidates(doc,pos=pos,stoplost=stoplist)
-
-#  Embded ================
-word_emb, dists = embed_sort(doc,words,sbert)
-
-# Cluster ======================
-lbs = get_clusters(word_emb)
-
-# Group and sort===================
-ws, rs = get_mean_sort(words,dists,lbs,n=5)
-
-
+    # Print =======================
+    print_top(ws)
