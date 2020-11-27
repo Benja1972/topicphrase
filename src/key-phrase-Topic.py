@@ -61,7 +61,6 @@ def embed_sort(doc,words,sbert):
 
     # Sorting
     idxs = dists.argsort()[0][::-1]
-    # ~ kws = [(words[idx],dists[0][idx]) for idx in idxs]
     return word_emb, dists
 
 
@@ -106,6 +105,9 @@ def merge_compounds(d):
                 'LEMMA': ''.join(t.lemma_ for t in d[b:e+1])
             })
     return d
+
+def print_top(wa,n=8):
+    pprint([w[:n] for w in wa])
 # ===========================================
 
 
@@ -113,16 +115,22 @@ def merge_compounds(d):
 # Load data  and embedder ============================
 
 nm = 'Self-driving_car'
+print(nm)
+print('='*20)
+
 f_in  = '../data/self-car.txt'
 docs = []
+
 with open(f_in, 'r') as fin:
     for dcc in fin:
         docs.append(dcc.strip('\r\n'))
 
 doc = ' '.join(docs)
 
-model = 'distilbert-base-nli-stsb-mean-tokens'
+# ~ model = 'distilbert-base-nli-stsb-mean-tokens'
+model = 'distilbert-base-nli-stsb-wkpooling'
 sbert = SentenceTransformer(model)
+sbert.max_seq_length = 256
 # ===========================================
 
 
@@ -135,25 +143,22 @@ stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
 stoplist += stop_words
 words = get_candidates(doc,pos=pos,stoplost=stoplist)
 
-#  ===========================
-
-print('='*20)
-print(nm)
-print('='*20)
-
-
+#  Embded ================
 word_emb, dists = embed_sort(doc,words,sbert)
+
+# Cluster ======================
 lbs = get_clusters(word_emb)
 
-
-# ~ lbus = set(lbs)
-
+# Group and sort===================
 ws, rs = get_mean_sort(words,dists,lbs,n=5)
 
 
 
-def print_top(wa,n=8):
-    pprint([w[:n] for w in wa])
+
+
+
+
+
 
 
 
