@@ -28,5 +28,4 @@ if res is not None:
     
     with open(fout, 'w') as fo:
         for par in pars:
-            # ~ fo.write(" ".join(simple_preprocess(par.text, deacc=True))+'\n')
             fo.write(clean(par.text)+'\n')
