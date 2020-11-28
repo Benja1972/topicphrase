@@ -15,7 +15,7 @@ import hdbscan
 # ==  Functions
 
 
-def get_candidates(doc,pos,stoplost):
+def get_candidates(doc,pos,stoplist):
     nlp = spacy.load('en')  # or any model
     nlp.add_pipe(merge_compounds)
     ext = pke.unsupervised.MultipartiteRank()
@@ -50,7 +50,7 @@ def get_mean_sort(words,dists,lbs,n=5):
     return ws, rs
         
 
-def embed_sort(doc,words,sbert):
+def embedd_dist(doc,words,sbert):
     # Extract Embeddings
     doc_emb = sbert.encode([doc])
     word_emb = sbert.encode(words)
@@ -58,9 +58,6 @@ def embed_sort(doc,words,sbert):
     # Calculate distances 
     dists = util.pytorch_cos_sim(doc_emb, word_emb).numpy()
 
-
-    # Sorting
-    idxs = dists.argsort()[0][::-1]
     return word_emb, dists
 
 
@@ -139,10 +136,10 @@ if __name__ == '__main__':
     stoplist = list(string.punctuation)
     stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
     stoplist += stop_words
-    words = get_candidates(doc,pos=pos,stoplost=stoplist)
+    words = get_candidates(doc,pos=pos,stoplist=stoplist)
 
     #  Embded ================
-    word_emb, dists = embed_sort(doc,words,sbert)
+    word_emb, dists = embedd_dist(doc,words,sbert)
 
     # Cluster ======================
     lbs = get_clusters(word_emb)

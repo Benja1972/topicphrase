@@ -61,7 +61,7 @@ words = get_candidates(doc,pos=pos,stoplist=stoplist)
 
 
 ```python
-word_emb, dists = embed_sort(doc,words,sbert)
+word_emb, dists = embedd_dist(doc,words,sbert)
 ```
 
 ## Group candiadates in topics (clusters)
