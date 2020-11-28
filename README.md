@@ -15,6 +15,10 @@ import string
 ```
 
 ## Load data   
+For data we use Wikipedia article about [self-driving car](https://en.wikipedia.org/wiki/Self-driving_car)
+
+
+    A self-driving car, also known as an autonomous vehicle (AV), connected and autonomous vehicle (CAV), full self-driving car or driverless car, or robo-car or robotic car, (automated vehicles and fully automated vehicles in the European Union) is a vehicle that is capable of sensing its environment and moving safely with little or no human input.
 
 
 ```python
@@ -394,6 +398,4 @@ for w in wsr_c:
 
 
 
-```python
 
-```
