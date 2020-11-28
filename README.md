@@ -2,7 +2,7 @@
 Simple code for extraction of key-phrases from single document based on Sentence Trasfomers [sentence-transformers](https://github.com/UKPLab/sentence-transformers). It combines several ideas from different pacakges. Core steps of pipe-line include:
 - extract noun phrase candidates using spacy (for simplicity we take part of the  code from pke package [pke](https://github.com/boudinfl/pke));
 - calculate embedding of phrases and orogonal document with help of  Sentence Trasfomers;
-- cluster key-phrase vectors with HDBSCAN to group them in topics;
+- cluster key-phrase vectors with HDBSCAN to group them in topics (idea comes from nice [Top2Vec](https://github.com/ddangelov/Top2Vec));
 - sort groups (topics) and key-phases inside clusters by relevance to orogonal document.
 
 
