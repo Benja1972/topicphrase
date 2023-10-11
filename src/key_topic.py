@@ -14,13 +14,20 @@ import umap
 import hdbscan
 
 # ==  Functions
-def get_candidates(doc,pos,stoplist):
+def get_candidates(doc,pos = {'NOUN', 'PROPN', 'ADJ'},stoplist = None):
     nlp = spacy.load('en_core_web_sm')  # or any model
     nlp.add_pipe("merge_compound")
     ext = pke.unsupervised.MultipartiteRank()
-    ext.load_document(doc, max_length=5173682, spacy_model=nlp)
+    stop_list = list(string.punctuation)
+    stop_list += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
+    stop_list += pke.lang.stopwords.get('en')
+    if stoplist:
+        stop_list += stoplist
+    # ~ ext.load_document(doc, max_length=5173682, spacy_model=nlp)
+    ext.load_document(doc, spacy_model=nlp, stoplist=stoplist)
     print('Selecting candidates key-phrases')
-    ext.candidate_selection(pos=pos, stoplist=stoplist)
+    # ~ ext.candidate_selection(pos=pos, stoplist=stoplist)
+    ext.candidate_selection(pos=pos)
     words = [' '.join(cdd.surface_forms[0]) for st,cdd in ext.candidates.items()]
     return words
 
@@ -132,13 +139,11 @@ if __name__ == '__main__':
 
 
     # Get candidates =============
-    stop_words = stopwords.words('english')
+  
+    # Add custom stoplist
+    # ~ stoplist = []
 
-    pos = {'NOUN', 'PROPN', 'ADJ'} 
-    stoplist = list(string.punctuation)
-    stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
-    stoplist += stop_words
-    words = get_candidates(doc,pos=pos,stoplist=stoplist)
+    words = get_candidates(doc)
 
     #  Embded ================
     word_emb = sbert.encode(words)
