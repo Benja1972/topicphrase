@@ -3,8 +3,7 @@ from sentence_transformers import SentenceTransformer, util
 
 import string
 import pke
-from nltk.corpus import stopwords
-import nltk
+
 import spacy
 from spacy.language import Language
 from pprint import pprint

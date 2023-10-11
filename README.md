@@ -8,10 +8,7 @@ Simple code for extraction of key-phrases from single document based on Sentence
 
 ```python
 from src.key_topic import *
-from sentence_transformers import SentenceTransformer, util
-from nltk.corpus import stopwords
-import nltk
-import string
+from sentence_transformers import SentenceTransformer
 ```
 
 ## Load data   
@@ -41,24 +38,16 @@ sbert = SentenceTransformer(model)
 ```
 
 
-```python
-stop_words = stopwords.words('english')
-
-pos = {'NOUN', 'PROPN', 'ADJ'} 
-stoplist = list(string.punctuation)
-stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
-stoplist += stop_words
-```
-
 ## Get noun phrases candidates
 
 
 ```python
-words = get_candidates(doc,pos=pos,stoplist=stoplist)
+words = get_candidates(doc)
 ```
 
+```sh
     Selecting candidates key-phrases
-
+```
 
 ## Calculate embedding of key-phrases and original text
 
@@ -88,7 +77,7 @@ for w in wsr_c:
 ```
 
     
-    
+```    
     Sorted by centroids
     
     0.62424296 ['autonomous driving', 'autonomous vehicle', 'autonomous car', 'autonomous system', 'autonomous transportation']
@@ -158,7 +147,7 @@ for w in wsr_c:
     -0.028057314 ['increase', 'exponential increase', 'fast increase', 'necessary increase', 'incremental advances']
     -0.0586837 ['years old', 'years', 'age', 'old', 'decades']
     -0.13896333 ['month', 'March', 'March update', 'early October', 'February']
-
+```
 
 
 ```python
@@ -171,7 +160,7 @@ for w in wsr_d:
 ```
 
     
-    
+```    
     Sorted by original doc
     
     0.62424296 ['autonomous vehicles market', 'autonomous vehicle', 'autonomous car', 'autonomous vehicle industry', 'many autonomous vehicles']
@@ -241,10 +230,10 @@ for w in wsr_d:
     -0.028057314 ['extra data', 'elevated rail', 'incremental permutations', 'incremental advances', 'rapid advance']
     -0.0586837 ['era', 'US adults', 'elderly', 'lifetimes', 'old']
     -0.13896333 ['updates', 'NHTSA', 'May', 'Kazan', 'updates schedule']
-
+```
 
 ### Granularity of clusters 
-Granularity of clusters could be controled by decreasing *min_cluster_size*
+Granularity of clusters could be controled by decreasing `min_cluster_size`
 
 
 ```python
@@ -263,7 +252,7 @@ for w in wsr_c:
 ```
 
     
-    
+```    
     Sorted by centroids
     
     0.61354375 ['autonomous car', 'autonomous driving', 'landmark autonomous car', 'autonomous vehicles market', 'autonomous vehicle industry']
@@ -396,6 +385,6 @@ for w in wsr_c:
     -0.09958036 ['second challenge', 'second occurrence', 'second state', 'latter term', 'replacement']
     -0.17684199 ['month', 'November', 'early October', 'November update', 'October']
 
-
+```
 
 
