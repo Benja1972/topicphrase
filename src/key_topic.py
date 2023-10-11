@@ -6,6 +6,7 @@ import pke
 from nltk.corpus import stopwords
 import nltk
 import spacy
+from spacy.language import Language
 from pprint import pprint
 
 
@@ -14,8 +15,8 @@ import hdbscan
 
 # ==  Functions
 def get_candidates(doc,pos,stoplist):
-    nlp = spacy.load('en')  # or any model
-    nlp.add_pipe(merge_compounds)
+    nlp = spacy.load('en_core_web_sm')  # or any model
+    nlp.add_pipe("merge_compound")
     ext = pke.unsupervised.MultipartiteRank()
     ext.load_document(doc, max_length=5173682, spacy_model=nlp)
     print('Selecting candidates key-phrases')
@@ -38,7 +39,7 @@ def get_clusters(word_emb, min_cluster_size=10):
     return lbs
 
 
-
+@Language.component('merge_compound')
 def merge_compounds(d):
     """ Merge compounds to be one token
 
