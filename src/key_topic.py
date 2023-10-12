@@ -12,8 +12,138 @@ from pprint import pprint
 import umap
 import hdbscan
 
+# Package class
+class KeyPhraser:
+    def __init__(self, 
+                 model = 'distilbert-base-nli-stsb-mean-tokens', 
+                 stoplist = None, 
+                 grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
+                 tokenizer = "grammar",
+                 pos = {'NOUN', 'PROPN', 'ADJ'},
+                 maximum_word_number=3):
+        
+        nlp = spacy.load('en_core_web_sm')  
+        nlp.add_pipe("merge_compound")
+        self.nlp = nlp
+        self.embedder = SentenceTransformer(model)
+        self.grammar =  grammar
+        self.pos = pos
+        self.maximum_word_number=maximum_word_number
+
+        self.stoplist = list(string.punctuation)
+        self.stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
+        self.stoplist += pke.lang.stopwords.get('en')
+        if stoplist:
+            self.stoplist += stoplist
+        
+        if tokenizer == "grammar":
+            self.extractor = pke.unsupervised.PositionRank()
+        elif tokenizer == "POS":
+            self.extractor = pke.unsupervised.MultipartiteRank()
+        else:
+            raise ValueError(f'Invalid tokenizer: {tokenizer}. Select one of ["POS", "grammar"]')
+        
+        self.tokenizer = tokenizer
+        
+    def load_document(self, doc):
+        self.extractor.load_document(doc, spacy_model=self.nlp, stoplist=self.stoplist)
+        self.doc = doc
+    
+    def get_candidates(self):
+        print('Selecting candidates key-phrases')
+        if self.tokenizer == "grammar":
+            self.extractor.candidate_selection(grammar=self.grammar, 
+                                               maximum_word_number=self.maximum_word_number)
+        elif self.tokenizer == "POS":
+            self.extractor.candidate_selection(pos=self.pos)
+        else:
+            raise ValueError(f'Invalid tokenizer: {self.tokenizer}. Select one of ["POS", "grammar"]')
+        
+        self.vocab = [' '.join(cdd.surface_forms[0]) for st,cdd in self.extractor.candidates.items()]
+    
+    def __embedding(self):
+        # embedding 
+        self.vocab_emb = self.embedder.encode(self.vocab)
+        self.doc_emb = self.embedder.encode([self.doc])
+
+    def cluster(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
+        self.__embedding()
+        
+        ump = umap.UMAP(n_neighbors=min_cluster_size,
+                        n_components=3,
+                        metric='cosine') #,random_state=234
+        um = ump.fit_transform(self.vocab_emb)
+
+        cls = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
+                                cluster_selection_epsilon=cluster_selection_epsilon,
+                                min_samples=1,
+                                metric='euclidean',
+                                cluster_selection_method='eom').fit(um) # 'leaf' 'eom'
+
+        self.labels  = cls.labels_
+
+
+    def sorted_keywords(self, sort_by="centroid"):
+        wn = []
+        for lc in set(self.labels):
+            si = list(np.where(self.labels==lc)[0])
+            cle = self.vocab_emb[si]
+            word_cls = [self.vocab[i] for i in si]
+
+            ccl = cle.mean(axis=0)
+            dsc = util.pytorch_cos_sim(ccl, self.doc_emb).numpy()[0][0]
+            
+            if sort_by=="doc":
+                sc = util.pytorch_cos_sim(self.doc_emb, cle).numpy()
+            elif sort_by=="centroid":
+                sc = util.pytorch_cos_sim(ccl, cle).numpy()
+            else:
+                raise ValueError(f'Sorting methond: {sort_by} is not implemented. Select one of ["centroid", "doc"]')
+            
+            idx = np.argsort(sc)[0][::-1]
+            
+            wnn = (dsc, [word_cls[i] for i in idx])
+            wn.append(wnn)
+        
+        smar = np.array([w[0] for w in wn])
+        idxs = np.argsort(smar)[::-1]
+
+        return [wn[ids] for ids in idxs]
+        
+    def fit(self,doc):
+        self.load_document(doc)
+        self.get_candidates()
+        self.cluster()
+        
+        
+            
+            
+            
+        
+
+
 # ==  Functions
-def get_candidates(doc,pos = {'NOUN', 'PROPN', 'ADJ'},stoplist = None):
+def get_grammar_candidates(doc,grammar = None):
+    nlp = spacy.load('en_core_web_sm')  # or any model
+    nlp.add_pipe("merge_compound")
+    ext = pke.unsupervised.PositionRank()
+    
+    # define the grammar for selecting the keyphrase candidates
+    if not grammar:
+        grammar = "NP: {<ADJ>*<NOUN|PROPN>+}"
+
+    ext.load_document(doc, spacy_model=nlp, language='en')
+    print('Selecting candidates key-phrases')
+    ext.candidate_selection(grammar=grammar, 
+                            maximum_word_number=3)
+    # ~ if pos:
+        # ~ ext.candidate_selection(pos=pos)
+    # ~ else:
+        # ~ ext.candidate_selection()
+    words = [' '.join(cdd.surface_forms[0]) for st,cdd in ext.candidates.items()]
+    return words
+
+def get_candidates(doc,pos = None,stoplist = None):
     nlp = spacy.load('en_core_web_sm')  # or any model
     nlp.add_pipe("merge_compound")
     ext = pke.unsupervised.MultipartiteRank()
@@ -23,10 +153,13 @@ def get_candidates(doc,pos = {'NOUN', 'PROPN', 'ADJ'},stoplist = None):
     if stoplist:
         stop_list += stoplist
     # ~ ext.load_document(doc, max_length=5173682, spacy_model=nlp)
-    ext.load_document(doc, spacy_model=nlp, stoplist=stoplist)
+    ext.load_document(doc, spacy_model=nlp, stoplist=stop_list)
     print('Selecting candidates key-phrases')
     # ~ ext.candidate_selection(pos=pos, stoplist=stoplist)
-    ext.candidate_selection(pos=pos)
+    if pos:
+        ext.candidate_selection(pos=pos)
+    else:
+        ext.candidate_selection()
     words = [' '.join(cdd.surface_forms[0]) for st,cdd in ext.candidates.items()]
     return words
 
@@ -130,7 +263,7 @@ if __name__ == '__main__':
         for dcc in fin:
             docs.append(dcc.strip('\r\n'))
 
-    doc = ' '.join(docs)
+    doc = ' '.join(docs[:5])
 
     model = 'distilbert-base-nli-stsb-mean-tokens'
     sbert = SentenceTransformer(model)
@@ -142,7 +275,8 @@ if __name__ == '__main__':
     # Add custom stoplist
     # ~ stoplist = []
 
-    words = get_candidates(doc)
+    # ~ words = get_candidates(doc)
+    words = get_grammar_candidates(doc)
 
     #  Embded ================
     word_emb = sbert.encode(words)
