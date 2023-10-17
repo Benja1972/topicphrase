@@ -272,7 +272,8 @@ if __name__ == '__main__':
         for dcc in fin:
             docs.append(dcc.strip('\r\n'))
 
-    doc = ' '.join(docs[:5])
+    # ~ doc = ' '.join(docs[:5])
+    doc = docs[:5]
     
     # = Initiate key-phrases extractor ===========
     kph = KeyPhraser()
