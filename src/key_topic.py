@@ -6,6 +6,7 @@ import pke
 
 import spacy
 from spacy.language import Language
+from spacy.tokens import Doc
 from pprint import pprint
 
 
@@ -91,9 +92,16 @@ class KeyPhraser:
         
         self.tokenizer = tokenizer
         
-    def load_document(self, doc):
-        self.extractor.load_document(doc, spacy_model=self.nlp, stoplist=self.stoplist)
-        self.doc = doc
+    def load_document(self, text):
+        if (isinstance(text, list) and all(isinstance(doc, str) for doc in text)):
+            inputs = Doc.from_docs([self.nlp(doc) for doc in text])
+            docs = text
+        elif  isinstance(text, str):
+            inputs = text
+            docs = [text]
+
+        self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
+        self.docs = docs
     
     def get_candidates(self):
         print('Selecting candidates key-phrases')
@@ -110,7 +118,7 @@ class KeyPhraser:
     def __embedding(self):
         # embedding 
         self.vocab_emb = self.embedder.encode(self.vocab)
-        self.doc_emb = self.embedder.encode([self.doc])
+        self.doc_emb = self.embedder.encode(self.docs)
 
     def cluster(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
         self.__embedding()
@@ -129,7 +137,7 @@ class KeyPhraser:
         self.labels  = cls.labels_
 
 
-    def sorted_topics(self, sort_by="centroid"):
+    def sorted_topics(self, sort_by="centroid", doc_id = 0):
         wn = []
         for lc in set(self.labels):
             si = list(np.where(self.labels==lc)[0])
@@ -137,10 +145,11 @@ class KeyPhraser:
             word_cls = [self.vocab[i] for i in si]
 
             ccl = cle.mean(axis=0)
-            dsc = util.pytorch_cos_sim(ccl, self.doc_emb).numpy()[0][0]
+            doc_emb = self.doc_emb[doc_id]
+            dsc = util.pytorch_cos_sim(ccl, doc_emb).numpy()[0][0]
             
             if sort_by=="doc":
-                sc = util.pytorch_cos_sim(self.doc_emb, cle).numpy()
+                sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
             elif sort_by=="centroid":
                 sc = util.pytorch_cos_sim(ccl, cle).numpy()
             else:
@@ -263,7 +272,8 @@ if __name__ == '__main__':
         for dcc in fin:
             docs.append(dcc.strip('\r\n'))
 
-    doc = ' '.join(docs[:5])
+    # ~ doc = ' '.join(docs[:5])
+    doc = docs[:5]
     
     # = Initiate key-phrases extractor ===========
     kph = KeyPhraser()
