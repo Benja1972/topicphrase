@@ -71,7 +71,10 @@ class KeyPhraser:
         
         nlp = spacy.load('en_core_web_sm')  
         nlp.add_pipe("merge_compound")
+        # add the sentence splitter
+        nlp.add_pipe('sentencizer')
         self.nlp = nlp
+        
         self.embedder = SentenceTransformer(model)
         self.grammar =  grammar
         self.pos = pos
@@ -99,6 +102,8 @@ class KeyPhraser:
         elif  isinstance(text, str):
             inputs = text
             docs = [text]
+        else:
+            raise ValueError(f'Input documents should be a string or list of stings!')
 
         self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
         self.docs = docs
