@@ -274,6 +274,7 @@ if __name__ == '__main__':
 
     # ~ doc = ' '.join(docs[:5])
     doc = docs[:5]
+
     
     # = Initiate key-phrases extractor ===========
     kph = KeyPhraser()
