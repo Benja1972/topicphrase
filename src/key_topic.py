@@ -3,6 +3,7 @@ from sentence_transformers import SentenceTransformer, util
 
 import string
 import pke
+from collections import Counter
 
 import spacy
 from spacy.language import Language
@@ -69,7 +70,7 @@ class KeyPhraser:
                  pos = {'NOUN', 'PROPN', 'ADJ'},
                  maximum_word_number=3):
         
-        nlp = spacy.load('en_core_web_sm')  
+        nlp = spacy.load('en_core_web_sm')
         nlp.add_pipe("merge_compound")
         # add the sentence splitter
         nlp.add_pipe('sentencizer')
@@ -140,6 +141,20 @@ class KeyPhraser:
                                 cluster_selection_method='eom').fit(um) # 'leaf' 'eom'
 
         self.labels  = cls.labels_
+        
+        # calculate topics == 
+        cnt = Counter(self.labels)
+        counts = dict(cnt.most_common())
+        topics_embeddings = {lc:self.vocab_emb[list(np.where(self.labels==lc)[0])].mean(axis=0) for lc in set(self.labels)}
+        vs = np.vstack(list(topics_embeddings.values()))
+        vl = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
+        sv = vl.mean(axis=0)
+        distances = {lc:sv[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
+        
+        self.topics = {lc:{"embedding":topics_embeddings[lc],
+                           "counts": counts[lc],
+                           "distance":distances[lc]} for lc in topics_embeddings.keys()}
+
 
 
     def sorted_topics(self, sort_by="centroid", doc_id = 0):
