@@ -97,6 +97,7 @@ class KeyPhraser:
         self.tokenizer = tokenizer
         
     def load_document(self, text):
+        print('Loading documents\n'+40*'-')
         if (isinstance(text, list) and all(isinstance(doc, str) for doc in text)):
             inputs = Doc.from_docs([self.nlp(doc) for doc in text])
             docs = text
@@ -110,7 +111,7 @@ class KeyPhraser:
         self.docs = docs
     
     def get_candidates(self):
-        print('Selecting candidates key-phrases')
+        print('Selecting candidates key-phrases\n'+40*'-')
         if self.tokenizer == "grammar":
             self.extractor.candidate_selection(grammar=self.grammar, 
                                                maximum_word_number=self.maximum_word_number)
@@ -122,38 +123,63 @@ class KeyPhraser:
         self.vocab = [' '.join(cdd.surface_forms[0]) for st,cdd in self.extractor.candidates.items()]
     
     def __embedding(self):
+        print('Embedding documents and phrases \n'+40*'-')
         # embedding 
         self.vocab_emb = self.embedder.encode(self.vocab)
         self.doc_emb = self.embedder.encode(self.docs)
 
-    def cluster(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
-        self.__embedding()
+    def __cluster(self):
+        # ~ self.__embedding()
+        print('Clustering \n'+40*'-')
         
-        ump = umap.UMAP(n_neighbors=min_cluster_size,
+        ump = umap.UMAP(n_neighbors=self.min_cluster_size,
                         n_components=3,
                         metric='cosine') #,random_state=234
         um = ump.fit_transform(self.vocab_emb)
 
-        cls = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                                cluster_selection_epsilon=cluster_selection_epsilon,
+        cls = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size,
+                                cluster_selection_epsilon=self.cluster_selection_epsilon,
                                 min_samples=1,
                                 metric='euclidean',
                                 cluster_selection_method='eom').fit(um) # 'leaf' 'eom'
 
         self.labels  = cls.labels_
+    
+    def topic_modeling(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
+        self.min_cluster_size = min_cluster_size
+        self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.__embedding()
+        self.__cluster()
         
-        # calculate topics == 
+        # == Calculate topics == 
         cnt = Counter(self.labels)
+        
+        # Topic counts
         counts = dict(cnt.most_common())
+        
+        # Topic words
+        topic_words = {lc:[self.vocab[i] for i in list(np.where(self.labels==lc)[0])] for lc in self.labels}
+        
+        # Topic embeddings
         topics_embeddings = {lc:self.vocab_emb[list(np.where(self.labels==lc)[0])].mean(axis=0) for lc in set(self.labels)}
         vs = np.vstack(list(topics_embeddings.values()))
-        vl = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
-        sv = vl.mean(axis=0)
-        distances = {lc:sv[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
+        doc_topic_matrix = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
         
-        self.topics = {lc:{"embedding":topics_embeddings[lc],
+        # Documents-topics similarity distribution 
+        self.doc_topic_matrix = doc_topic_matrix
+        
+        sim = doc_topic_matrix.mean(axis=0)
+        
+        # Similarity between documents and centroids of topics 
+        topic_doc_sim = {lc:sim[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
+        
+        # Store topics in the class variable
+        topics = {lc:{"topic_words":topic_words[lc],
+                           "embedding":topics_embeddings[lc],
                            "counts": counts[lc],
-                           "distance":distances[lc]} for lc in topics_embeddings.keys()}
+                           "doc_similarity":topic_doc_sim[lc]} for lc in topics_embeddings.keys()}
+        self.topics = dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+
 
 
 
@@ -185,100 +211,13 @@ class KeyPhraser:
 
         return [wn[ids] for ids in idxs]
         
-    def fit(self,doc):
-        self.load_document(doc)
+    def fit(self,docs):
+        self.load_document(docs)
         self.get_candidates()
-        self.cluster()
-        
-        
-            
-            
-            
+        self.topic_modeling()
         
 
 
-# ==  Functions
-def get_grammar_candidates(doc,grammar = None):
-    nlp = spacy.load('en_core_web_sm')  # or any model
-    nlp.add_pipe("merge_compound")
-    ext = pke.unsupervised.PositionRank()
-    
-    # define the grammar for selecting the keyphrase candidates
-    if not grammar:
-        grammar = "NP: {<ADJ>*<NOUN|PROPN>+}"
-
-    ext.load_document(doc, spacy_model=nlp, language='en')
-    print('Selecting candidates key-phrases')
-    ext.candidate_selection(grammar=grammar, 
-                            maximum_word_number=3)
-    # ~ if pos:
-        # ~ ext.candidate_selection(pos=pos)
-    # ~ else:
-        # ~ ext.candidate_selection()
-    words = [' '.join(cdd.surface_forms[0]) for st,cdd in ext.candidates.items()]
-    return words
-
-def get_candidates(doc,pos = None,stoplist = None):
-    nlp = spacy.load('en_core_web_sm')  # or any model
-    nlp.add_pipe("merge_compound")
-    ext = pke.unsupervised.MultipartiteRank()
-    stop_list = list(string.punctuation)
-    stop_list += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
-    stop_list += pke.lang.stopwords.get('en')
-    if stoplist:
-        stop_list += stoplist
-    # ~ ext.load_document(doc, max_length=5173682, spacy_model=nlp)
-    ext.load_document(doc, spacy_model=nlp, stoplist=stop_list)
-    print('Selecting candidates key-phrases')
-    # ~ ext.candidate_selection(pos=pos, stoplist=stoplist)
-    if pos:
-        ext.candidate_selection(pos=pos)
-    else:
-        ext.candidate_selection()
-    words = [' '.join(cdd.surface_forms[0]) for st,cdd in ext.candidates.items()]
-    return words
-
-
-def get_clusters(word_emb, min_cluster_size=10):
-    ump = umap.UMAP(n_neighbors=min_cluster_size,n_components=3,metric='cosine') #,random_state=234
-    um = ump.fit_transform(word_emb)
-
-    cls = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                            cluster_selection_epsilon=0.2,
-                            min_samples=1,
-                            metric='euclidean',
-                            cluster_selection_method='eom').fit(um) # 'leaf' 'eom'
-
-    lbs  = cls.labels_
-    return lbs
-
-
-
-def centr_sort(words, word_emb, lbs, doc_emb, sort_by="centroid"):
-    wn = []
-    for lc in set(lbs):
-        si = list(np.where(lbs==lc)[0])
-        cle = word_emb[si]
-        word_cls = [words[i] for i in si]
-
-        ccl = cle.mean(axis=0)
-        dsc = util.pytorch_cos_sim(ccl, doc_emb).numpy()[0][0]
-        
-        if sort_by=="doc":
-            sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
-        else:
-            sc = util.pytorch_cos_sim(ccl, cle).numpy()
-        
-        idx = np.argsort(sc)[0][::-1]
-        
-        wnn = (dsc, [word_cls[i] for i in idx])
-        wn.append(wnn)
-    
-    smar = np.array([w[0] for w in wn])
-    idxs = np.argsort(smar)[::-1]
-
-    wns = [wn[ids] for ids in idxs]
-    return wns
 # ===========================================
 
 if __name__ == '__main__':
@@ -293,7 +232,7 @@ if __name__ == '__main__':
             docs.append(dcc.strip('\r\n'))
 
     # ~ doc = ' '.join(docs[:5])
-    doc = docs[:5]
+    doc = docs[:15]
 
     
     # = Initiate key-phrases extractor ===========
