@@ -68,7 +68,9 @@ class KeyPhraser:
                  grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
                  tokenizer = "grammar",
                  pos = {'NOUN', 'PROPN', 'ADJ'},
-                 maximum_word_number=3):
+                 maximum_word_number=3,
+                 min_cluster_size=10, 
+                 cluster_selection_epsilon=0.2):
         
         nlp = spacy.load('en_core_web_sm')
         nlp.add_pipe("merge_compound")
@@ -80,6 +82,8 @@ class KeyPhraser:
         self.grammar =  grammar
         self.pos = pos
         self.maximum_word_number=maximum_word_number
+        self.min_cluster_size = min_cluster_size
+        self.cluster_selection_epsilon = cluster_selection_epsilon
 
         self.stoplist = list(string.punctuation)
         self.stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
@@ -145,9 +149,7 @@ class KeyPhraser:
 
         self.labels  = cls.labels_
     
-    def topic_modeling(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
-        self.min_cluster_size = min_cluster_size
-        self.cluster_selection_epsilon = cluster_selection_epsilon
+    def topic_modeling(self):
         self.__embedding()
         self.__cluster()
         
@@ -187,9 +189,9 @@ class KeyPhraser:
         self.topics = dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
     
     
-    def print_topn_topics(self, top_n = 5, top_n_words = 5):
+    def output_topn_topics(self, top_n = 5, top_n_words = 5):
         out = [(self.topics[ls]["doc_similarity"],self.topics[ls]["topic_words"][:top_n_words]) for ls in list(self.topics.keys())[:top_n]]
-        pprint(out)
+        return out
         
     
     @staticmethod
@@ -277,26 +279,25 @@ if __name__ == '__main__':
         for dcc in fin:
             docs.append(dcc.strip('\r\n'))
 
-    # ~ doc = ' '.join(docs[:5])
-    doc = docs[:15]
+    doc = ' '.join(docs)
+    # ~ doc = docs[:15]
 
     
     # = Initiate key-phrases extractor ===========
-    kph = KeyPhraser()
+    kph = KeyPhraser(min_cluster_size = 6)
     
-    # = Fit document ============================
+    # = Fit documents ============================
     kph.fit(doc)
 
 
     # = Get sorted topics  ======================
-    wsr_d = kph.sorted_topics(sort_by="doc")
-    wsr_c = kph.sorted_topics(sort_by="centroid")
+    wsr_d = kph.doc_topn_topics(doc_id=0)
+
+    wsr_c = kph.output_topn_topics()
     
     # = Print topics  ==========================
     print("\n\nSorted by centroids\n")
-    for w in wsr_c:
-        print(w[0], w[1][:3])
+    pprint(wsr_c)
 
     print("\n\nSorted by original doc\n")
-    for w in wsr_d:
-        print(w[0], w[1][:3])
+    pprint(wsr_d)
