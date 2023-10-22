@@ -10,7 +10,7 @@ Simple code for extraction of key-phrases and group them in topics from a single
 from src.key_topic import *
 ```
 
-## Load data   
+## Load data
 For data we use Wikipedia article about [self-driving car](https://en.wikipedia.org/wiki/Self-driving_car)
 
 ```
