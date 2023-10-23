@@ -68,7 +68,9 @@ class KeyPhraser:
                  grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
                  tokenizer = "grammar",
                  pos = {'NOUN', 'PROPN', 'ADJ'},
-                 maximum_word_number=3):
+                 maximum_word_number=3,
+                 min_cluster_size=10, 
+                 cluster_selection_epsilon=0.2):
         
         nlp = spacy.load('en_core_web_sm')
         nlp.add_pipe("merge_compound")
@@ -80,6 +82,8 @@ class KeyPhraser:
         self.grammar =  grammar
         self.pos = pos
         self.maximum_word_number=maximum_word_number
+        self.min_cluster_size = min_cluster_size
+        self.cluster_selection_epsilon = cluster_selection_epsilon
 
         self.stoplist = list(string.punctuation)
         self.stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
@@ -145,23 +149,27 @@ class KeyPhraser:
 
         self.labels  = cls.labels_
     
-    def topic_modeling(self, min_cluster_size=10, cluster_selection_epsilon=0.2):
-        self.min_cluster_size = min_cluster_size
-        self.cluster_selection_epsilon = cluster_selection_epsilon
+    def topic_modeling(self):
         self.__embedding()
         self.__cluster()
         
         # == Calculate topics == 
-        cnt = Counter(self.labels)
+        
         
         # Topic counts
+        cnt = Counter(self.labels)
         counts = dict(cnt.most_common())
         
-        # Topic words
-        topic_words = {lc:[self.vocab[i] for i in list(np.where(self.labels==lc)[0])] for lc in self.labels}
+        # Topic calculus
+        topic_sats = {lc:[(self.vocab[i],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in self.labels}
+        topic_sats = {lc:self.__sort_centroid(v) for lc,v in topic_sats.items()}
         
-        # Topic embeddings
-        topics_embeddings = {lc:self.vocab_emb[list(np.where(self.labels==lc)[0])].mean(axis=0) for lc in set(self.labels)}
+        # Topic embeddings and sorted words
+        # ~ topics_embeddings = {lc:self.vocab_emb[list(np.where(self.labels==lc)[0])].mean(axis=0) for lc in set(self.labels)}
+        
+        topics_words = {lc:v[1] for lc,v in topic_sats.items()}
+        topics_embeddings = {lc:v[0] for lc,v in topic_sats.items()}
+        # ~ vs = np.vstack([v[0] for v in topic_words.items()])
         vs = np.vstack(list(topics_embeddings.values()))
         doc_topic_matrix = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
         
@@ -174,14 +182,54 @@ class KeyPhraser:
         topic_doc_sim = {lc:sim[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
         
         # Store topics in the class variable
-        topics = {lc:{"topic_words":topic_words[lc],
-                           "embedding":topics_embeddings[lc],
-                           "counts": counts[lc],
-                           "doc_similarity":topic_doc_sim[lc]} for lc in topics_embeddings.keys()}
+        topics = {lc: {"topic_words":topics_words[lc],
+                        "embedding":topics_embeddings[lc],
+                        "counts": counts[lc],
+                        "doc_similarity":topic_doc_sim[lc]} for lc in topics_embeddings.keys()}
         self.topics = dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+    
+    
+    def output_topn_topics(self, top_n = 5, top_n_words = 5):
+        out = [(self.topics[ls]["doc_similarity"],self.topics[ls]["topic_words"][:top_n_words]) for ls in list(self.topics.keys())[:top_n]]
+        return out
+        
+    
+    @staticmethod
+    def __sort_centroid(wd):
+        class_emb = np.vstack([w[1] for w in wd])
+        centr_emb = class_emb.mean(axis=0)
+        sc = util.pytorch_cos_sim(centr_emb, class_emb).numpy()
+        idx = np.argsort(sc)[0][::-1]
+                
+        return centr_emb, [(wd[i][0],sc[0][i]) for i in idx]
 
 
+    def doc_topn_topics(self, doc_id = None, top_n = 5, top_n_words = 5):
+        topic_id = dict(enumerate(list(self.topics.keys())))
+        doc_emb = self.doc_emb[doc_id]
+        
+        tp_v = self.doc_topic_matrix[doc_id]
+        idx = np.argsort(tp_v)[::-1]
+        idx = idx[:top_n]
+        wn = []
+        for i in idx:
+            lc = topic_id[i]
+            
+            si = list(np.where(self.labels==lc)[0])
+            cle = self.vocab_emb[si]
+            word_cls = [self.vocab[i] for i in si]
 
+            ccl = cle.mean(axis=0)
+            sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
+            idx_w = np.argsort(sc)[0][::-1]
+            idx_w = idx_w[:top_n_words]
+            
+            wnn = (tp_v[i], [word_cls[i] for i in idx_w])
+            wn.append(wnn)
+        return wn
+            
+
+        
 
     def sorted_topics(self, sort_by="centroid", doc_id = 0):
         wn = []
@@ -231,26 +279,25 @@ if __name__ == '__main__':
         for dcc in fin:
             docs.append(dcc.strip('\r\n'))
 
-    # ~ doc = ' '.join(docs[:5])
-    doc = docs[:15]
+    doc = ' '.join(docs)
+    # ~ doc = docs[:15]
 
     
     # = Initiate key-phrases extractor ===========
-    kph = KeyPhraser()
+    kph = KeyPhraser(min_cluster_size = 6)
     
-    # = Fit document ============================
+    # = Fit documents ============================
     kph.fit(doc)
 
 
     # = Get sorted topics  ======================
-    wsr_d = kph.sorted_topics(sort_by="doc")
-    wsr_c = kph.sorted_topics(sort_by="centroid")
+    wsr_d = kph.doc_topn_topics(doc_id=0)
+
+    wsr_c = kph.output_topn_topics()
     
     # = Print topics  ==========================
     print("\n\nSorted by centroids\n")
-    for w in wsr_c:
-        print(w[0], w[1][:3])
+    pprint(wsr_c)
 
     print("\n\nSorted by original doc\n")
-    for w in wsr_d:
-        print(w[0], w[1][:3])
+    pprint(wsr_d)
