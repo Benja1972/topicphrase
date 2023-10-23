@@ -67,6 +67,7 @@ class KeyPhraser:
                  stoplist = None, 
                  grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
                  tokenizer = "grammar",
+                 min_kpf = 1,
                  pos = {'NOUN', 'PROPN', 'ADJ'},
                  maximum_word_number=3,
                  min_cluster_size=10, 
@@ -81,6 +82,7 @@ class KeyPhraser:
         self.embedder = SentenceTransformer(model)
         self.grammar =  grammar
         self.pos = pos
+        self.min_kpf = min_kpf
         self.maximum_word_number=maximum_word_number
         self.min_cluster_size = min_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
@@ -124,7 +126,11 @@ class KeyPhraser:
         else:
             raise ValueError(f'Invalid tokenizer: {self.tokenizer}. Select one of ["POS", "grammar"]')
         
-        self.vocab = [' '.join(cdd.surface_forms[0]) for st,cdd in self.extractor.candidates.items()]
+        vocab = [(' '.join(cdd.surface_forms[0]).lower(),len(cdd.surface_forms)) for st,cdd in self.extractor.candidates.items()]
+
+        if self.min_kpf >1:
+            vocab = [v for v in vocab if v[1]>=self.min_kpf]
+        self.vocab = [v[0] for v in vocab]
     
     def __embedding(self):
         print('Embedding documents and phrases \n'+40*'-')
@@ -257,7 +263,7 @@ if __name__ == '__main__':
 
     
     # = Initiate key-phrases extractor ===========
-    kph = KeyPhraser(min_cluster_size = 6)
+    kph = KeyPhraser(min_cluster_size = 6, min_kpf = 5)
     
     # = Fit documents ============================
     kph.fit(doc)
