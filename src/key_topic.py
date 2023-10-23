@@ -153,7 +153,7 @@ class KeyPhraser:
         self.__embedding()
         self.__cluster()
         
-        # == Calculate topics == 
+        # == Calculate topics ==
         
         
         # Topic counts
