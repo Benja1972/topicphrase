@@ -161,7 +161,7 @@ class KeyPhraser:
         counts = dict(cnt.most_common())
         
         # Topic calculus
-        topic_sats = {lc:[(self.vocab[i],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in self.labels}
+        topic_sats = {lc:[(self.vocab[i],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in set(self.labels)}
         topic_sats = {lc:self.__sort_centroid(v) for lc,v in topic_sats.items()}
         
         # Topic embeddings and sorted words
@@ -169,6 +169,7 @@ class KeyPhraser:
         
         topics_words = {lc:v[1] for lc,v in topic_sats.items()}
         topics_embeddings = {lc:v[0] for lc,v in topic_sats.items()}
+        self.topic_id = dict(enumerate(list(topics_embeddings.keys())))
         # ~ vs = np.vstack([v[0] for v in topic_words.items()])
         vs = np.vstack(list(topics_embeddings.values()))
         doc_topic_matrix = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
@@ -179,18 +180,19 @@ class KeyPhraser:
         sim = doc_topic_matrix.mean(axis=0)
         
         # Similarity between documents and centroids of topics 
-        topic_doc_sim = {lc:sim[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
+        topic_doc_sim = {lc:sim[i] for i,lc in self.topic_id.items()}
         
         # Store topics in the class variable
-        topics = {lc: {"topic_words":topics_words[lc],
+        topics = {lc:  {"topic_words":topics_words[lc],
                         "embedding":topics_embeddings[lc],
                         "counts": counts[lc],
                         "doc_similarity":topic_doc_sim[lc]} for lc in topics_embeddings.keys()}
-        self.topics = dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+        self.topics = topics #dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
     
     
     def output_topn_topics(self, top_n = 5, top_n_words = 5):
-        out = [(self.topics[ls]["doc_similarity"],self.topics[ls]["topic_words"][:top_n_words]) for ls in list(self.topics.keys())[:top_n]]
+        sorted_topics = dict(sorted(self.topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+        out = [(lc,sorted_topics[lc]["doc_similarity"],sorted_topics[lc]["topic_words"][:top_n_words]) for lc in list(sorted_topics.keys())[:top_n]]
         return out
         
     
@@ -205,7 +207,7 @@ class KeyPhraser:
 
 
     def doc_topn_topics(self, doc_id = None, top_n = 5, top_n_words = 5):
-        topic_id = dict(enumerate(list(self.topics.keys())))
+        
         doc_emb = self.doc_emb[doc_id]
         
         tp_v = self.doc_topic_matrix[doc_id]
@@ -213,7 +215,7 @@ class KeyPhraser:
         idx = idx[:top_n]
         wn = []
         for i in idx:
-            lc = topic_id[i]
+            lc = self.topic_id[i]
             
             si = list(np.where(self.labels==lc)[0])
             cle = self.vocab_emb[si]
@@ -224,40 +226,11 @@ class KeyPhraser:
             idx_w = np.argsort(sc)[0][::-1]
             idx_w = idx_w[:top_n_words]
             
-            wnn = (tp_v[i], [word_cls[i] for i in idx_w])
+            wnn = (lc, tp_v[i], [word_cls[i] for i in idx_w])
             wn.append(wnn)
         return wn
             
 
-        
-
-    def sorted_topics(self, sort_by="centroid", doc_id = 0):
-        wn = []
-        for lc in set(self.labels):
-            si = list(np.where(self.labels==lc)[0])
-            cle = self.vocab_emb[si]
-            word_cls = [self.vocab[i] for i in si]
-
-            ccl = cle.mean(axis=0)
-            doc_emb = self.doc_emb[doc_id]
-            dsc = util.pytorch_cos_sim(ccl, doc_emb).numpy()[0][0]
-            
-            if sort_by=="doc":
-                sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
-            elif sort_by=="centroid":
-                sc = util.pytorch_cos_sim(ccl, cle).numpy()
-            else:
-                raise ValueError(f'Sorting methond: {sort_by} is not implemented. Select one of ["centroid", "doc"]')
-            
-            idx = np.argsort(sc)[0][::-1]
-            
-            wnn = (dsc, [word_cls[i] for i in idx])
-            wn.append(wnn)
-        
-        smar = np.array([w[0] for w in wn])
-        idxs = np.argsort(smar)[::-1]
-
-        return [wn[ids] for ids in idxs]
         
     def fit(self,docs):
         self.load_document(docs)
