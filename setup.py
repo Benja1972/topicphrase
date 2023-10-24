@@ -1,8 +1,13 @@
-from distutils.core import setup, find_packages
+from setuptools import setup, find_packages
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(name='topicphrase',
       version='0.2.0',
       description='Keyphrases extraction and topic modeling with Sentence Transformers',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       author='Sergei Rybalko',
       author_email='benja1972@gmail.com',
       license='BSD',

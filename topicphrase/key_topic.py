@@ -2,6 +2,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer, util
 
 import string
+from nltk.stem.snowball import SnowballStemmer
 import pke
 from collections import Counter
 
@@ -90,6 +91,7 @@ class KeyPhraser:
         self.stoplist = list(string.punctuation)
         self.stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
         self.stoplist += pke.lang.stopwords.get('en')
+        self.stemmer = SnowballStemmer("english", ignore_stopwords=True)
         if stoplist:
             self.stoplist += stoplist
         
@@ -115,6 +117,7 @@ class KeyPhraser:
 
         self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
         self.docs = docs
+        self.docs_stemmed = [" ".join([stemmer.stem(w).lower() for w in doc.split()]) for doc in  kph.docs]
     
     def get_candidates(self):
         print('Selecting candidates key-phrases\n'+40*'-')
@@ -126,17 +129,18 @@ class KeyPhraser:
         else:
             raise ValueError(f'Invalid tokenizer: {self.tokenizer}. Select one of ["POS", "grammar"]')
         
-        vocab = [(' '.join(cdd.surface_forms[0]).lower(),len(cdd.surface_forms)) for st,cdd in self.extractor.candidates.items()]
+        vocab = [(st,' '.join(cdd.surface_forms[0]).lower(),len(cdd.surface_forms)) for st,cdd in self.extractor.candidates.items()]
 
         if self.min_phrase_freq >1:
-            vocab = [v for v in vocab if v[1]>=self.min_phrase_freq]
-        self.vocab = [v[0] for v in vocab]
+            vocab = [v for v in vocab if v[2]>=self.min_phrase_freq]
+        # ~ self.vocab = [v[0] for v in vocab]
+        self.vocab = vocab
         print(f"\n Extracted {len(self.vocab)} number of keyphases candidates \n"+ 40*"-")
     
     def __embedding(self):
         print('Embedding documents and phrases \n'+40*'-')
         # embedding 
-        self.vocab_emb = self.embedder.encode(self.vocab)
+        self.vocab_emb = self.embedder.encode([v[1] for v in self.vocab])
         self.doc_emb = self.embedder.encode(self.docs)
 
     def __cluster(self):
@@ -168,7 +172,7 @@ class KeyPhraser:
         counts = dict(cnt.most_common())
         
         # Topic calculus
-        topic_sats = {lc:[(self.vocab[i],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in set(self.labels)}
+        topic_sats = {lc:[(self.vocab[i][1],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in set(self.labels)}
         topic_sats = {lc:self.__sort_centroid(v) for lc,v in topic_sats.items()}
         
         # Topic embeddings and sorted words
@@ -226,7 +230,7 @@ class KeyPhraser:
             
             si = list(np.where(self.labels==lc)[0])
             cle = self.vocab_emb[si]
-            word_cls = [self.vocab[i] for i in si]
+            word_cls = [self.vocab[i][1] for i in si]
 
             ccl = cle.mean(axis=0)
             sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
