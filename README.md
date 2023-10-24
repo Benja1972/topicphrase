@@ -1,4 +1,4 @@
-# Key-phrase extraction with Sentence Transformers
+# Key-phrases extraction and topic modeling with Sentence Transformers
 Simple code for extraction of key-phrases and group them in topics from a single document or set of documents based on dense vectors representations (embeddings). The Sentence Transformers [sentence-transformers](https://github.com/UKPLab/sentence-transformers) is used to embed the documents and key-phrases candidates. It combines several ideas from different packages. Core steps of pipe-line include:
 - extract noun phrase candidates using spacy (for simplicity we take part of the  code from pke package [pke](https://github.com/boudinfl/pke));
 - calculate embedding of phrases and original document with help of  Sentence Transformers;
@@ -7,7 +7,7 @@ Simple code for extraction of key-phrases and group them in topics from a single
 
 
 ```python
-from src.key_topic import *
+from topicphrase.key_topic import *
 ```
 
 ## Load data
