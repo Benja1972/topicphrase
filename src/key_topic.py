@@ -67,7 +67,7 @@ class KeyPhraser:
                  stoplist = None, 
                  grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
                  tokenizer = "grammar",
-                 min_kpf = 1,
+                 min_phrase_freq = 1,
                  pos = {'NOUN', 'PROPN', 'ADJ'},
                  maximum_word_number=3,
                  min_cluster_size=10, 
@@ -82,7 +82,7 @@ class KeyPhraser:
         self.embedder = SentenceTransformer(model)
         self.grammar =  grammar
         self.pos = pos
-        self.min_kpf = min_kpf
+        self.min_phrase_freq = min_phrase_freq
         self.maximum_word_number=maximum_word_number
         self.min_cluster_size = min_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
@@ -98,7 +98,7 @@ class KeyPhraser:
         elif tokenizer == "POS":
             self.extractor = pke.unsupervised.MultipartiteRank()
         else:
-            raise ValueError(f'Invalid tokenizer: {tokenizer}. Select one of ["POS", "grammar"]')
+            raise ValueError(f'Invalid tokenizer method: {tokenizer}. Select one of ["POS", "grammar"]')
         
         self.tokenizer = tokenizer
         
@@ -128,9 +128,10 @@ class KeyPhraser:
         
         vocab = [(' '.join(cdd.surface_forms[0]).lower(),len(cdd.surface_forms)) for st,cdd in self.extractor.candidates.items()]
 
-        if self.min_kpf >1:
-            vocab = [v for v in vocab if v[1]>=self.min_kpf]
+        if self.min_phrase_freq >1:
+            vocab = [v for v in vocab if v[1]>=self.min_phrase_freq]
         self.vocab = [v[0] for v in vocab]
+        print(f"\n Extracted {len(self.vocab)} number of keyphases candidates \n"+ 40*"-")
     
     def __embedding(self):
         print('Embedding documents and phrases \n'+40*'-')
@@ -232,7 +233,7 @@ class KeyPhraser:
             idx_w = np.argsort(sc)[0][::-1]
             idx_w = idx_w[:top_n_words]
             
-            wnn = (lc, tp_v[i], [word_cls[i] for i in idx_w])
+            wnn = (lc, tp_v[i], [(word_cls[i],sc[0][i]) for i in idx_w])
             wn.append(wnn)
         return wn
             
@@ -263,20 +264,21 @@ if __name__ == '__main__':
 
     
     # = Initiate key-phrases extractor ===========
-    kph = KeyPhraser(min_cluster_size = 6, min_kpf = 5)
+    kph = KeyPhraser()
     
     # = Fit documents ============================
     kph.fit(doc)
 
 
     # = Get sorted topics  ======================
-    wsr_d = kph.doc_topn_topics(doc_id=0)
+    doc_id = 0
+    wsr_d = kph.doc_topn_topics(doc_id=doc_id)
 
     wsr_c = kph.output_topn_topics()
     
     # = Print topics  ==========================
-    print("\n\nSorted by centroids\n")
+    print("\n\n Extracted topics ranked by similarity to the whole corpus and phrased sorted by centroids\n")
     pprint(wsr_c)
 
-    print("\n\nSorted by original doc\n")
+    print(f"\n\n Extracted topics ranked by similarity to the doc {doc_id} in the corpus\n")
     pprint(wsr_d)
