@@ -32,35 +32,35 @@ doc = ' '.join(docs)
 
 
 ```python
-ph = KeyPhraser()
+kph = KeyPhraser()
 ```
 
 
 ## Fit documents
-
+In will learn the keyphrases that match the defined part-of-speech or grammar pattern from the list of raw documents
+and clusters keyphrases in topics based on their similarity.
 
 ```python
 kph.fit(doc)
 ```
 
-
-## Sort groups by relevance to original document or centroids of clusters
-
+Extracted keyphrases are sorted as an vocabulary of the model. Now one can transform any list of raw documents to the document-keyphrase matrix against this keyphrases vocabulary.
 
 ```python
-# Sort by similarity to centroind of cluster
-wsr_c = kph.output_topn_topics()
-    
-# = Print topics  ==========================
-print("\n\nSorted by centroids\n")
-pprint(wsr_c)
-
+doc_matrix = kph.transform(raw_docs)
 ```
 
-    
-```sh
-Extracted topics ranked by similarity to the whole corpus and phrased sorted by centroids
+## Topics sorting by relevance to original document or centroids of clusters
 
+### Sort by similarity to centroid of cluster and print  topics:
+```python
+wsr_c = kph.output_topn_topics()
+
+pprint(wsr_c)
+```
+
+Extracted topics ranked by similarity to the *whole corpus* and phrased sorted by centroids
+```sh
 [(6,
   0.6340678,
   [('autonomous vehicle', 0.9270642),
@@ -99,19 +99,14 @@ Extracted topics ranked by similarity to the whole corpus and phrased sorted by 
 
 ```
 
-
+### Sort by similarity to original document:
 ```python
-# Sort by similarity to original document
 wsr_d = kph.doc_topn_topics(doc_id=0)
-
-print("\n\nSorted by original doc\n")
 pprint(wsr_d)
 ```
 
-    
+Extracted topics and phrases ranked by *similarity to the doc 0* in the corpus:
 ```sh
-Extracted topics and phrases ranked by similarity to the doc 0 in the corpus
-
 [(6,
   0.6340678,
   [('autonomous vehicles market', 0.583479),
@@ -150,14 +145,11 @@ Extracted topics and phrases ranked by similarity to the doc 0 in the corpus
 
 ```
 
-
-### Granularity of clusters
-Granularity of clusters could be controlled by decreasing `min_cluster_size`, the default is 10
-
+## Granularity of clusters
+Granularity of clusters could be controlled by decreasing `min_cluster_size`, the default is 10. Moreover one can filter kepyphrases by their counts in total corpus of documents by tuning `min_phrase_freq`. 
 
 ```python
-# Decrease 'min_cluster_size' to get more fine topics
-kph = KeyPhraser(min_cluster_size = 6)
+kph = KeyPhraser(min_cluster_size = 6, min_phrase_freq = 5)
 
 kph.fit(doc)
 ```
