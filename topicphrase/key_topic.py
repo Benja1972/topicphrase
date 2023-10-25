@@ -1,10 +1,12 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
 
+from typing import List
 import string
 from nltk.stem.snowball import SnowballStemmer
 import pke
 from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer
 
 import spacy
 from spacy.language import Language
@@ -117,7 +119,7 @@ class KeyPhraser:
 
         self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
         self.docs = docs
-        self.docs_stemmed = [" ".join([stemmer.stem(w).lower() for w in doc.split()]) for doc in  kph.docs]
+        # ~ self.docs_stemmed = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  self.docs]
     
     def get_candidates(self):
         print('Selecting candidates key-phrases\n'+40*'-')
@@ -247,6 +249,40 @@ class KeyPhraser:
         self.load_document(docs)
         self.get_candidates()
         self.topic_modeling()
+
+    def transform(self, raw_documents: List[str]) -> List[List[int]]:
+        """
+        Transform documents to document-keyphrase matrix.
+        Extract token counts out of raw text documents using the keyphrases
+        fitted with fit.
+
+        Parameters
+        ----------
+        raw_documents : iterable
+            An iterable of strings.
+
+        Returns
+        -------
+        X : sparse matrix of shape (n_samples, n_features)
+            Document-keyphrase matrix.
+        """
+
+        # triggers a parameter validation
+        if not hasattr(self, 'vocab'):
+            raise NotFittedError("Keyphrases not fitted.")
+        keyphrases = [w[0] for w in self.vocab]
+        self.max_n_gram_length = max([len(keyphrase.split()) for keyphrase in keyphrases])
+        self.min_n_gram_length = min([len(keyphrase.split()) for keyphrase in keyphrases])
+        stemmed_documents = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  raw_documents]
+        
+        token_pattern = r"(?u)\b\w[\w-]+\b" # alt. r"(?u)\b[\w-]+\b"
+
+        return CountVectorizer(vocabulary= keyphrases,
+                               ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
+                               lowercase=True, 
+                               binary=False,
+                               token_pattern = token_pattern,
+                               dtype = np.int64).transform(raw_documents=stemmed_documents)
         
 
 
