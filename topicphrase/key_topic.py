@@ -119,7 +119,7 @@ class KeyPhraser:
 
         self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
         self.docs = docs
-        # ~ self.docs_stemmed = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  self.docs]
+        
     
     def get_candidates(self):
         print('Selecting candidates key-phrases\n'+40*'-')
@@ -283,7 +283,11 @@ class KeyPhraser:
                                binary=False,
                                token_pattern = token_pattern,
                                dtype = np.int64).transform(raw_documents=stemmed_documents)
-        
+    def fit_transform(self, raw_documents: List[str]): -> List[List[int]]:
+        """
+        """
+        return None
+    # ~ self.docs_stemmed = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  self.docs]
 
 
 # ===========================================
