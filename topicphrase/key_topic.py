@@ -290,7 +290,7 @@ class KeyPhraser:
     # ~ self.docs_stemmed = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  self.docs]
 
 
-# ===========================================
+# ===============================================
 
 if __name__ == '__main__':
 
