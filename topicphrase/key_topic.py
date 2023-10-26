@@ -1,9 +1,12 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
 
+from typing import List
 import string
+from nltk.stem.snowball import SnowballStemmer
 import pke
 from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer
 
 import spacy
 from spacy.language import Language
@@ -67,6 +70,7 @@ class KeyPhraser:
                  stoplist = None, 
                  grammar = "NP: {<ADJ>*<NOUN|PROPN>+}",
                  tokenizer = "grammar",
+                 min_phrase_freq = 1,
                  pos = {'NOUN', 'PROPN', 'ADJ'},
                  maximum_word_number=3,
                  min_cluster_size=10, 
@@ -81,6 +85,7 @@ class KeyPhraser:
         self.embedder = SentenceTransformer(model)
         self.grammar =  grammar
         self.pos = pos
+        self.min_phrase_freq = min_phrase_freq
         self.maximum_word_number=maximum_word_number
         self.min_cluster_size = min_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
@@ -88,6 +93,7 @@ class KeyPhraser:
         self.stoplist = list(string.punctuation)
         self.stoplist += ['-lrb-', '-rrb-', '-lcb-', '-rcb-', '-lsb-', '-rsb-']
         self.stoplist += pke.lang.stopwords.get('en')
+        self.stemmer = SnowballStemmer("english", ignore_stopwords=True)
         if stoplist:
             self.stoplist += stoplist
         
@@ -96,7 +102,7 @@ class KeyPhraser:
         elif tokenizer == "POS":
             self.extractor = pke.unsupervised.MultipartiteRank()
         else:
-            raise ValueError(f'Invalid tokenizer: {tokenizer}. Select one of ["POS", "grammar"]')
+            raise ValueError(f'Invalid tokenizer method: {tokenizer}. Select one of ["POS", "grammar"]')
         
         self.tokenizer = tokenizer
         
@@ -113,6 +119,7 @@ class KeyPhraser:
 
         self.extractor.load_document(inputs, spacy_model=self.nlp, stoplist=self.stoplist)
         self.docs = docs
+        
     
     def get_candidates(self):
         print('Selecting candidates key-phrases\n'+40*'-')
@@ -124,12 +131,18 @@ class KeyPhraser:
         else:
             raise ValueError(f'Invalid tokenizer: {self.tokenizer}. Select one of ["POS", "grammar"]')
         
-        self.vocab = [' '.join(cdd.surface_forms[0]) for st,cdd in self.extractor.candidates.items()]
+        vocab = [(st,' '.join(cdd.surface_forms[0]).lower(),len(cdd.surface_forms)) for st,cdd in self.extractor.candidates.items()]
+
+        if self.min_phrase_freq >1:
+            vocab = [v for v in vocab if v[2]>=self.min_phrase_freq]
+        # ~ self.vocab = [v[0] for v in vocab]
+        self.vocab = vocab
+        print(f"\n Extracted {len(self.vocab)} number of keyphases candidates \n"+ 40*"-")
     
     def __embedding(self):
         print('Embedding documents and phrases \n'+40*'-')
         # embedding 
-        self.vocab_emb = self.embedder.encode(self.vocab)
+        self.vocab_emb = self.embedder.encode([v[1] for v in self.vocab])
         self.doc_emb = self.embedder.encode(self.docs)
 
     def __cluster(self):
@@ -153,7 +166,7 @@ class KeyPhraser:
         self.__embedding()
         self.__cluster()
         
-        # == Calculate topics == 
+        # == Calculate topics ==
         
         
         # Topic counts
@@ -161,7 +174,7 @@ class KeyPhraser:
         counts = dict(cnt.most_common())
         
         # Topic calculus
-        topic_sats = {lc:[(self.vocab[i],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in self.labels}
+        topic_sats = {lc:[(self.vocab[i][1],self.vocab_emb[i]) for i in list(np.where(self.labels==lc)[0])] for lc in set(self.labels)}
         topic_sats = {lc:self.__sort_centroid(v) for lc,v in topic_sats.items()}
         
         # Topic embeddings and sorted words
@@ -169,6 +182,7 @@ class KeyPhraser:
         
         topics_words = {lc:v[1] for lc,v in topic_sats.items()}
         topics_embeddings = {lc:v[0] for lc,v in topic_sats.items()}
+        self.topic_id = dict(enumerate(list(topics_embeddings.keys())))
         # ~ vs = np.vstack([v[0] for v in topic_words.items()])
         vs = np.vstack(list(topics_embeddings.values()))
         doc_topic_matrix = util.pytorch_cos_sim(self.doc_emb, vs).numpy()
@@ -179,18 +193,19 @@ class KeyPhraser:
         sim = doc_topic_matrix.mean(axis=0)
         
         # Similarity between documents and centroids of topics 
-        topic_doc_sim = {lc:sim[i] for i,lc in enumerate(list(topics_embeddings.keys()))}
+        topic_doc_sim = {lc:sim[i] for i,lc in self.topic_id.items()}
         
         # Store topics in the class variable
-        topics = {lc: {"topic_words":topics_words[lc],
+        topics = {lc:  {"topic_words":topics_words[lc],
                         "embedding":topics_embeddings[lc],
                         "counts": counts[lc],
                         "doc_similarity":topic_doc_sim[lc]} for lc in topics_embeddings.keys()}
-        self.topics = dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+        self.topics = topics #dict(sorted(topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
     
     
     def output_topn_topics(self, top_n = 5, top_n_words = 5):
-        out = [(self.topics[ls]["doc_similarity"],self.topics[ls]["topic_words"][:top_n_words]) for ls in list(self.topics.keys())[:top_n]]
+        sorted_topics = dict(sorted(self.topics.items(), key=lambda item: item[1]["doc_similarity"],reverse= True))
+        out = [(lc,sorted_topics[lc]["doc_similarity"],sorted_topics[lc]["topic_words"][:top_n_words]) for lc in list(sorted_topics.keys())[:top_n]]
         return out
         
     
@@ -205,7 +220,7 @@ class KeyPhraser:
 
 
     def doc_topn_topics(self, doc_id = None, top_n = 5, top_n_words = 5):
-        topic_id = dict(enumerate(list(self.topics.keys())))
+        
         doc_emb = self.doc_emb[doc_id]
         
         tp_v = self.doc_topic_matrix[doc_id]
@@ -213,60 +228,69 @@ class KeyPhraser:
         idx = idx[:top_n]
         wn = []
         for i in idx:
-            lc = topic_id[i]
+            lc = self.topic_id[i]
             
             si = list(np.where(self.labels==lc)[0])
             cle = self.vocab_emb[si]
-            word_cls = [self.vocab[i] for i in si]
+            word_cls = [self.vocab[i][1] for i in si]
 
             ccl = cle.mean(axis=0)
             sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
             idx_w = np.argsort(sc)[0][::-1]
             idx_w = idx_w[:top_n_words]
             
-            wnn = (tp_v[i], [word_cls[i] for i in idx_w])
+            wnn = (lc, tp_v[i], [(word_cls[i],sc[0][i]) for i in idx_w])
             wn.append(wnn)
         return wn
             
 
         
-
-    def sorted_topics(self, sort_by="centroid", doc_id = 0):
-        wn = []
-        for lc in set(self.labels):
-            si = list(np.where(self.labels==lc)[0])
-            cle = self.vocab_emb[si]
-            word_cls = [self.vocab[i] for i in si]
-
-            ccl = cle.mean(axis=0)
-            doc_emb = self.doc_emb[doc_id]
-            dsc = util.pytorch_cos_sim(ccl, doc_emb).numpy()[0][0]
-            
-            if sort_by=="doc":
-                sc = util.pytorch_cos_sim(doc_emb, cle).numpy()
-            elif sort_by=="centroid":
-                sc = util.pytorch_cos_sim(ccl, cle).numpy()
-            else:
-                raise ValueError(f'Sorting methond: {sort_by} is not implemented. Select one of ["centroid", "doc"]')
-            
-            idx = np.argsort(sc)[0][::-1]
-            
-            wnn = (dsc, [word_cls[i] for i in idx])
-            wn.append(wnn)
-        
-        smar = np.array([w[0] for w in wn])
-        idxs = np.argsort(smar)[::-1]
-
-        return [wn[ids] for ids in idxs]
-        
     def fit(self,docs):
         self.load_document(docs)
         self.get_candidates()
         self.topic_modeling()
+
+    def transform(self, raw_documents: List[str]) -> List[List[int]]:
+        """
+        Transform documents to document-keyphrase matrix.
+        Extract token counts out of raw text documents using the keyphrases
+        fitted with fit.
+
+        Parameters
+        ----------
+        raw_documents : iterable
+            An iterable of strings.
+
+        Returns
+        -------
+        X : sparse matrix of shape (n_samples, n_features)
+            Document-keyphrase matrix.
+        """
+
+        # triggers a parameter validation
+        if not hasattr(self, 'vocab'):
+            raise NotFittedError("Keyphrases not fitted.")
+        keyphrases = [w[0] for w in self.vocab]
+        self.max_n_gram_length = max([len(keyphrase.split()) for keyphrase in keyphrases])
+        self.min_n_gram_length = min([len(keyphrase.split()) for keyphrase in keyphrases])
+        stemmed_documents = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  raw_documents]
         
+        token_pattern = r"(?u)\b\w[\w-]+\b" # alt. r"(?u)\b[\w-]+\b"
+
+        return CountVectorizer(vocabulary= keyphrases,
+                               ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
+                               lowercase=True, 
+                               binary=False,
+                               token_pattern = token_pattern,
+                               dtype = np.int64).transform(raw_documents=stemmed_documents)
+    def fit_transform(self, raw_documents: List[str]): -> List[List[int]]:
+        """
+        """
+        return None
+    # ~ self.docs_stemmed = [" ".join([self.stemmer.stem(w).lower() for w in doc.split()]) for doc in  self.docs]
 
 
-# ===========================================
+# ===============================================
 
 if __name__ == '__main__':
 
@@ -284,20 +308,21 @@ if __name__ == '__main__':
 
     
     # = Initiate key-phrases extractor ===========
-    kph = KeyPhraser(min_cluster_size = 6)
+    kph = KeyPhraser()
     
     # = Fit documents ============================
     kph.fit(doc)
 
 
     # = Get sorted topics  ======================
-    wsr_d = kph.doc_topn_topics(doc_id=0)
+    doc_id = 0
+    wsr_d = kph.doc_topn_topics(doc_id=doc_id)
 
     wsr_c = kph.output_topn_topics()
     
     # = Print topics  ==========================
-    print("\n\nSorted by centroids\n")
+    print("\n\n Extracted topics ranked by similarity to the whole corpus and phrased sorted by centroids\n")
     pprint(wsr_c)
 
-    print("\n\nSorted by original doc\n")
+    print(f"\n\n Extracted topics ranked by similarity to the doc {doc_id} in the corpus\n")
     pprint(wsr_d)
