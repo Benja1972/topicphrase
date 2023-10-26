@@ -1,4 +1,3 @@
- 
 A self-driving car, also known as an autonomous vehicle (AV), connected and autonomous vehicle (CAV), full self-driving car or driverless car, or robo-car or robotic car, (automated vehicles and fully automated vehicles in the European Union) is a vehicle that is capable of sensing its environment and moving safely with little or no human input. 
 Self-driving cars combine a variety of sensors to perceive their surroundings, such as radar, lidar, sonar, GPS, odometry and inertial measurement units. Advanced control systems interpret sensory information to identify appropriate navigation paths, as well as obstacles and relevant signage. 
 Connected vehicle platoons and long-distance trucking are seen as being at the forefront of adopting and implementing the technology. 
@@ -169,4 +168,4 @@ In March , ahead of the autonomous racing series Roborace, Robocar set the Guinn
 In , Daimler launch the Mercedes-Benz S-Class (W) with software ready to be downloaded over the air as soon as law permits level ALKS in . 
 Also in , Honda claims to be granted the safety certification by Japanese government to their autonomous "Traffic Jam Pilot" driving technology, which legally allow drivers to take their eyes off the road. Honda plans to launch the new Honda Legend equipped with the newly approved automated driving equipment by no later than March . 
 The automated and occasionally sentient self-driving car story has earned its place in both literary science fiction and pop sci-fi. 
-Intelligent or self-driving cars are a common theme in science fiction literature. Examples include: 
+Intelligent or self-driving cars are a common theme in science fiction literature. Examples include:
